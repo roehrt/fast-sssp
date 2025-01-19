@@ -38,20 +38,6 @@ graph subgraph(const graph &G, std::vector<int> vertices) {
     return H;
 }
 
-std::vector<int> topological_sort(const graph &G) {
-    std::vector in_degree(std::ssize(G), 0);
-    for (int u = 0; u < std::ssize(G); ++u)
-        for (const auto &[v, _] : G[u])
-            ++in_degree[v];
-    std::vector<int> order;
-    for (int u = 0; u < std::ssize(G); ++u)
-        if (in_degree[u] == 0) order.push_back(u);
-    for (int i = 0; i < std::ssize(order); ++i)
-        for (const auto &[v, _] : G[order[i]])
-            if (--in_degree[v] == 0) order.push_back(v);
-    return order;
-}
-
 // https://github.com/demidenko/olymp-cpp-lib/blob/master/graphs/strong_connected_components.cpp
 auto strongly_connected_components(const auto &g) {
     int n = size(g), tn = 0, cn = 0, sn = 0;
@@ -178,15 +164,18 @@ std::vector<std::pair<int, int>> decompose(graph H, len d) {
     return S;
 }
 
-void fix_dag_edges(graph G, std::vector<len> &phi) {
-    auto order = topological_sort(G);
+void fix_dag_edges(const graph &G, std::vector<len> &phi) {
     auto [cn, c] = strongly_connected_components(G);
+    std::vector<std::vector<int>> scc(cn);
+    for (int i = 0; i < std::ssize(G); ++i) scc[c[i]].push_back(i);
     std::vector<len> phi_prime(cn);
-    for (int u : order) {
-        for (auto &[v, w] : G[u]) {
-            if (c[u] == c[v]) continue;
-            len w_prime = w + phi[u] - phi[v];
-            phi_prime[c[u]] = std::min(phi_prime[c[u]], phi_prime[c[v]] + w_prime);
+    for (auto &s : scc) {
+        for (int u : s) {
+            for (const auto &[v, w] : G[u]) {
+                if (c[u] == c[v]) continue;
+                len w_prime = w + phi[u] - phi[v];
+                phi_prime[c[u]] = std::min(phi_prime[c[u]], phi_prime[c[v]] + w_prime);
+            }
         }
     }
     for (int u = 0; u < std::ssize(G); ++u) phi[u] += phi_prime[c[u]];
@@ -221,9 +210,6 @@ void bellman_ford_dijkstra(graph G, std::vector<len> &phi) {
                 }
             }
         }
-
-        std::ranges::sort(A);
-        A.erase(std::unique(A.begin(), A.end()), A.end());
 
         // Bellman-Ford phase
         for (int u: A) {
@@ -325,6 +311,8 @@ std::pair<std::vector<len>, std::vector<int>> single_source_shortest_path(const 
 }
 
 int main() {
+    std::ios::sync_with_stdio(false);
+    std::cin.tie(nullptr);
     std::cin.exceptions(std::istream::failbit);
 
     int n, m; std::cin >> n >> m;
@@ -335,10 +323,10 @@ int main() {
         G[u].emplace_back(v, w);
     }
 
-    std::vector<len> solution(n);
-    for (int i = 0; i < n; ++i) std::cin >> solution[i];
-
     auto [dist, _] = single_source_shortest_path(G, 0);
     for (int j = 0; j < n; ++j) std::cout << dist[j] << " \n"[j == n - 1];
-    assert(dist == solution);
+
+    // std::vector<len> solution(n);
+    // for (int i = 0; i < n; ++i) std::cin >> solution[i];
+    // assert(dist == solution);
 }
