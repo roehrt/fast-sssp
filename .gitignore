@@ -3,3 +3,4 @@ cmake-build-*/
 *.in
 *.out
 *.txt
+!CMakeLists.txt
