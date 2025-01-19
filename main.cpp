@@ -27,17 +27,6 @@ void remove_edges(graph &G, std::vector<std::pair<int, int>> edges) {
     }
 }
 
-graph subgraph(const graph &G, std::vector<int> vertices) {
-    graph H(std::ssize(vertices));
-    std::vector<int> index(std::ssize(G), -1);
-    for (int i = 0; i < std::ssize(vertices); ++i) index[vertices[i]] = i;
-    for (int u = 0; u < std::ssize(G); ++u)
-        for (const auto &[v, w] : G[u])
-            if (index[u] != -1 && index[v] != -1)
-                H[index[u]].emplace_back(index[v], w);
-    return H;
-}
-
 // https://github.com/demidenko/olymp-cpp-lib/blob/master/graphs/strong_connected_components.cpp
 auto strongly_connected_components(const auto &g) {
     int n = size(g), tn = 0, cn = 0, sn = 0;
@@ -71,7 +60,8 @@ void reweight(graph &G, const std::vector<len> &phi) {
 }
 
 std::vector<double> approximate_ball_sizes(const graph& G, len r, double epsilon) {
-    const int samples = ceil(5 * log(G.size()) / std::pow(epsilon, 2));
+    const double MAGIC_CONSTANT = 0.001; // 5;
+    const int samples = ceil(MAGIC_CONSTANT * log(G.size()) / std::pow(epsilon, 2));
     assert(samples > 0);
 
     std::vector<int> count(G.size());
@@ -243,9 +233,17 @@ std::vector<len> scale(graph G) {
         std::vector<std::vector<int>> scc(cn);
         for (int i = 0; i < std::ssize(G); ++i) scc[c[i]].push_back(i);
 
+        std::vector<int> lookup(std::ssize(G));
         std::vector phi(std::ssize(G), 0_l);
         for (int i = 0; i < cn; ++i) {
-            auto U = subgraph(H, scc[i]);
+            graph U(scc[i].size());
+            for (int j = 0; j < std::ssize(scc[i]); ++j) lookup[scc[i][j]] = j;
+            for (int j = 0; j < std::ssize(scc[i]); ++j) {
+                int u = scc[i][j];
+                for (const auto &[v, w] : G[u]) {
+                    if (c[u] == c[v]) U[j].emplace_back(lookup[v], w);
+                }
+            }
             auto di = U.size() <= 3.0 / 4.0 * G.size() ? d : d / 2;
             auto psi = dfs(U, di);
             for (int j = 0; j < std::ssize(U); ++j) phi[scc[i][j]] = psi[j];
@@ -323,10 +321,13 @@ int main() {
         G[u].emplace_back(v, w);
     }
 
+    auto start = std::chrono::high_resolution_clock::now();
     auto [dist, _] = single_source_shortest_path(G, 0);
-    for (int j = 0; j < n; ++j) std::cout << dist[j] << " \n"[j == n - 1];
+    auto end = std::chrono::high_resolution_clock::now();
+    std::cerr << "Execution time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms\n";
+    // for (int j = 0; j < n; ++j) std::cout << dist[j] << " \n"[j == n - 1];
 
-    // std::vector<len> solution(n);
-    // for (int i = 0; i < n; ++i) std::cin >> solution[i];
-    // assert(dist == solution);
+    std::vector<len> solution(n);
+    for (int i = 0; i < n; ++i) std::cin >> solution[i];
+    assert(dist == solution);
 }
