@@ -3,9 +3,11 @@ extern "C" int __lsan_is_turned_off() { return 1; }
 
 std::mt19937 rng(42);
 
-using priority_queue = __gnu_pbds::priority_queue<std::pair<int, int>, std::greater<>>;
-using graph = std::vector<std::vector<std::pair<int, int>>>;
-const int inf = std::numeric_limits<int>::max() / 2;
+using len = int64_t;
+len operator ""_l(unsigned long long x) { return static_cast<len>(x); }
+const len inf = std::numeric_limits<len>::max() / 2;
+using graph = std::vector<std::vector<std::pair<int, len>>>;
+using priority_queue = __gnu_pbds::priority_queue<std::pair<len, int>, std::greater<>>;
 
 graph transpose(const graph &G) {
     graph Gt(std::ssize(G));
@@ -68,21 +70,21 @@ auto strongly_connected_components(const auto &g) {
     return std::pair{cn, c};
 }
 
-int minimum_weight(const graph &G) {
-    int W = inf;
+len minimum_weight(const graph &G) {
+    len W = inf;
     for (int u = 0; u < std::ssize(G); ++u)
         for (const auto &[v, w] : G[u])
             W = std::min(W, w);
     return W;
 }
 
-void reweight(graph &G, const std::vector<int> &phi) {
+void reweight(graph &G, const std::vector<len> &phi) {
     for (int u = 0; u < std::ssize(G); ++u)
         for (auto &[v, w] : G[u])
             w += phi[u] - phi[v];
 }
 
-std::vector<double> approximate_ball_sizes(const graph& G, int r, double epsilon) {
+std::vector<double> approximate_ball_sizes(const graph& G, len r, double epsilon) {
     const int samples = ceil(5 * log(G.size()) / std::pow(epsilon, 2));
     assert(samples > 0);
 
@@ -120,7 +122,7 @@ std::vector<double> approximate_ball_sizes(const graph& G, int r, double epsilon
     return ball_size;
 }
 
-std::vector<bool> in_light_vertices(const graph& G, int d) {
+std::vector<bool> in_light_vertices(const graph& G, len d) {
     double epsilon = 1.0 / 8.0;
     auto ball_size = approximate_ball_sizes(G, d / 4, epsilon);
     std::vector<bool> light(G.size());
@@ -129,10 +131,10 @@ std::vector<bool> in_light_vertices(const graph& G, int d) {
     return light;
 }
 
-std::vector<std::pair<int, int>> decompose(graph H, int d) {
+std::vector<std::pair<int, int>> decompose(graph H, len d) {
     for (int u = 0; u < std::ssize(H); ++u)
         for (auto &[v, w] : H[u])
-            w = std::max(w, 0);
+            w = std::max(w, 0_l);
 
     auto Ht = transpose(H);
 
@@ -140,7 +142,7 @@ std::vector<std::pair<int, int>> decompose(graph H, int d) {
     auto out_light = in_light_vertices(Ht, d);
 
     double p = std::min(1.0 - std::numeric_limits<double>::epsilon(), 20 * log(H.size()) / d);
-    std::geometric_distribution<int> geom(p);
+    std::geometric_distribution<len> geom(p);
 
     std::vector<std::pair<int, int>> S;
     std::vector<bool> is_deleted(H.size());
@@ -151,7 +153,7 @@ std::vector<std::pair<int, int>> decompose(graph H, int d) {
     auto carve = [&](auto &G, auto &light) {
         for (int i = 0; i < std::ssize(G); ++i) {
             if (!light[i] || is_deleted[i]) continue;
-            int r = geom(rng);
+            len r = geom(rng);
             pq.push({dist[i] = 0, i});
             while (!pq.empty()) {
                 auto [_, u] = pq.top();
@@ -176,21 +178,21 @@ std::vector<std::pair<int, int>> decompose(graph H, int d) {
     return S;
 }
 
-void fix_dag_edges(graph G, std::vector<int> &phi) {
+void fix_dag_edges(graph G, std::vector<len> &phi) {
     auto order = topological_sort(G);
     auto [cn, c] = strongly_connected_components(G);
-    std::vector<int> phi_prime(cn);
+    std::vector<len> phi_prime(cn);
     for (int u : order) {
         for (auto &[v, w] : G[u]) {
             if (c[u] == c[v]) continue;
-            int w_prime = w + phi[u] - phi[v];
+            len w_prime = w + phi[u] - phi[v];
             phi_prime[c[u]] = std::min(phi_prime[c[u]], phi_prime[c[v]] + w_prime);
         }
     }
     for (int u = 0; u < std::ssize(G); ++u) phi[u] += phi_prime[c[u]];
 }
 
-void bellman_ford_dijkstra(graph G, std::vector<int> &phi) {
+void bellman_ford_dijkstra(graph G, std::vector<len> &phi) {
     reweight(G, phi);
     graph G_neg(std::ssize(G));
     for (int u = 0; u < std::ssize(G); ++u) {
@@ -198,7 +200,7 @@ void bellman_ford_dijkstra(graph G, std::vector<int> &phi) {
         std::erase_if(G[u], [](const auto &p) { return p.second < 0; });
     }
 
-    std::vector<int> dist(std::ssize(G), 0);
+    std::vector dist(std::ssize(G), 0_l);
     priority_queue pq;
     std::vector<priority_queue::point_iterator> it(std::ssize(G));
     for (int i = 0; i < std::ssize(G); ++i) it[i] = pq.push({0, i});
@@ -238,15 +240,15 @@ void bellman_ford_dijkstra(graph G, std::vector<int> &phi) {
     for (int u = 0; u < std::ssize(G); ++u) phi[u] += dist[u];
 }
 
-std::vector<int> scale(graph G) {
-    int W = -minimum_weight(G);
+std::vector<len> scale(graph G) {
+    auto W = -minimum_weight(G);
 
     for (int u = 0; u < std::ssize(G); ++u)
         for (auto &[v, w] : G[u])
             w += (W + 1) / 2;
 
-    std::function<std::vector<int>(graph, int)> dfs = [&W, &dfs](graph H, int d) -> std::vector<int> {
-        if (H.size() <= 1 || d <= W / 2) return std::vector(std::ssize(H), 0);
+    std::function<std::vector<len>(graph, len)> dfs = [&W, &dfs](graph H, len d) -> std::vector<len> {
+        if (H.size() <= 1 || d <= W / 2) return std::vector(std::ssize(H), 0_l);
         auto S = decompose(H, d);
         auto G = H;
         remove_edges(H, S);
@@ -255,7 +257,7 @@ std::vector<int> scale(graph G) {
         std::vector<std::vector<int>> scc(cn);
         for (int i = 0; i < std::ssize(G); ++i) scc[c[i]].push_back(i);
 
-        std::vector phi(std::ssize(G), 0);
+        std::vector phi(std::ssize(G), 0_l);
         for (int i = 0; i < cn; ++i) {
             auto U = subgraph(H, scc[i]);
             auto di = U.size() <= 3.0 / 4.0 * G.size() ? d : d / 2;
@@ -276,8 +278,9 @@ std::vector<int> scale(graph G) {
     }
 }
 
-std::pair<std::vector<int>, std::vector<int>> dijkstra(const graph& G, int s) {
-    std::vector dist(G.size(), inf), par(G.size(), -1);
+std::pair<std::vector<len>, std::vector<int>> dijkstra(const graph& G, int s) {
+    std::vector<len> dist(G.size(), inf);
+    std::vector<int> par(G.size(), -1);
     priority_queue pq;
     std::vector<priority_queue::point_iterator> it(std::ssize(G));
     pq.push({dist[s] = 0, par[s] = s});
@@ -294,7 +297,7 @@ std::pair<std::vector<int>, std::vector<int>> dijkstra(const graph& G, int s) {
     return std::pair{dist, par};
 }
 
-std::pair<std::vector<int>, std::vector<int>> single_source_shortest_path(const graph &G, int s) {
+std::pair<std::vector<len>, std::vector<int>> single_source_shortest_path(const graph &G, int s) {
     graph H = G;
     for (int u = 0; u < std::ssize(H); ++u)
         for (auto &[v, w] : H[u])
@@ -309,11 +312,11 @@ std::pair<std::vector<int>, std::vector<int>> single_source_shortest_path(const 
     auto [_, par] = dijkstra(H, s);
 
     auto Gt = transpose(G);
-    std::vector<int> dist(G.size(), inf);
+    std::vector dist(G.size(), inf);
     dist[s] = 0;
-    std::function<int(int)> dfs = [&](int u) {
+    std::function<len(int)> dfs = [&](int u) {
         if (dist[u] != inf || par[u] == -1) return dist[u];
-        int W = inf;
+        len W = inf;
         for (const auto &[v, w] : Gt[u]) if (v == par[u]) W = std::min(W, w);
         return dist[u] = dfs(par[u]) + W;
     };
@@ -327,12 +330,12 @@ int main() {
     int n, m; std::cin >> n >> m;
     graph G(n);
     for (int i = 0; i < m; ++i) {
-        int u, v, w; std::cin >> u >> v >> w;
+        int u, v; len w; std::cin >> u >> v >> w;
         --u, --v;
         G[u].emplace_back(v, w);
     }
 
-    std::vector<int> solution(n);
+    std::vector<len> solution(n);
     for (int i = 0; i < n; ++i) std::cin >> solution[i];
 
     auto [dist, _] = single_source_shortest_path(G, 0);

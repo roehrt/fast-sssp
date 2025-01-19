@@ -16,7 +16,7 @@ for G, solution in gen():
         f.write(f'{G.number_of_nodes()} {G.number_of_edges()}\n')
         for u, v in G.edges():
             f.write(f'{u+1} {v+1} {G[u][v]["weight"]}\n')
-        f.write(' '.join(str(solution.get(u, (2**31-1) // 2)) for u in range(G.number_of_nodes())))
+        f.write(' '.join(str(solution.get(u, (2**63-1) // 2)) for u in range(G.number_of_nodes())))
     print('running...')
     with open('fuzz.in', 'r') as f:
         subprocess.run('./cmake-build-release/sssp', check=True, stdin=f)
