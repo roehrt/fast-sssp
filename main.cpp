@@ -1,5 +1,4 @@
 #include <bits/extc++.h>
-extern "C" int __lsan_is_turned_off() { return 1; }
 
 std::mt19937 rng(42);
 
@@ -27,22 +26,20 @@ void remove_edges(graph &G, std::vector<std::pair<int, int>> edges) {
     }
 }
 
-// https://github.com/demidenko/olymp-cpp-lib/blob/master/graphs/strong_connected_components.cpp
-auto strongly_connected_components(const auto &g) {
-    int n = size(g), tn = 0, cn = 0, sn = 0;
-    std::vector<int> t(n), h(n), c(n), s(n);
-    std::function<void(int)> css = [&](int v) -> void {
-        h[v] = t[v] = ++tn;
-        s[sn++] = v;
-        for(auto [i, _] : g[v]) {
-            if(!t[i]) css(i);
-            if(!c[i] && h[i] < h[v]) h[v] = h[i];
-        }
-        if(h[v] == t[v]) for(++cn; !c[v];) c[s[--sn]] = cn;
+auto strongly_connected_components(const graph &G) {
+    int T = 0, cn = 0;
+    std::vector<int> c(G.size()), b(G.size()), st;
+    std::function<int(int)> f = [&] (int u) {
+        int t = b[u] = ++T;
+        st.push_back(u);
+        for (auto [v, _] : G[u]) if (!c[v])
+            t = std::min(t, b[v] ?: f(v));
+        if (t == b[u] && ++cn) while (!c[u])
+            c[st.back()] = cn, st.pop_back();
+        return b[u] = t;
     };
-    for(int i=0; i<n; ++i) if(!t[i]) css(i);
-    for(int &x : c) x = cn-x;
-    return std::pair{cn, c};
+    for (int u = 0; u < std::ssize(G); ++u) if (!c[u]) f(u);
+    return std::pair{cn+1, c};
 }
 
 len minimum_weight(const graph &G) {
@@ -60,7 +57,7 @@ void reweight(graph &G, const std::vector<len> &phi) {
 }
 
 std::vector<double> approximate_ball_sizes(const graph& G, len r, double epsilon) {
-    const double MAGIC_CONSTANT = 0.001; // 5;
+    const double MAGIC_CONSTANT = 0.01; // Used to be 5;
     const int samples = ceil(MAGIC_CONSTANT * log(G.size()) / std::pow(epsilon, 2));
     assert(samples > 0);
 
@@ -321,13 +318,7 @@ int main() {
         G[u].emplace_back(v, w);
     }
 
-    auto start = std::chrono::high_resolution_clock::now();
-    auto [dist, _] = single_source_shortest_path(G, 0);
-    auto end = std::chrono::high_resolution_clock::now();
-    std::cerr << "Execution time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms\n";
-    // for (int j = 0; j < n; ++j) std::cout << dist[j] << " \n"[j == n - 1];
-
-    std::vector<len> solution(n);
-    for (int i = 0; i < n; ++i) std::cin >> solution[i];
-    assert(dist == solution);
+    auto [dist, par] = single_source_shortest_path(G, 0);
+    for (int j = 0; j < n; ++j) std::cout << dist[j] << " \n"[j == n - 1];
+    for (int j = 0; j < n; ++j) std::cout << par[j] + 1 << " \n"[j == n - 1];
 }
