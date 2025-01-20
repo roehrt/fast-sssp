@@ -1,6 +1,5 @@
 # Fast Negative-Weight SSSP
-
-This repository provides a standalone C++ implementation of the fast single-source shortest paths (SSSP) algorithm by Bringmann, Cassis, and Fischer [^2]. The implementation is based on the foundational algorithm developed by Bernstein, Nanongkai, and Wulff-Nilsen [^1], with additional insights drawn from Li and Mowry [^3].
+This repository provides a standalone C++ implementation of the fast single-source shortest paths (SSSP) algorithm by Bringmann, Cassis, and Fischer [^2], which builds upon the foundational algorithm developed by Bernstein, Nanongkai, and Wulff-Nilsen [^1]. Further implementation insights were derived from the work of Li and Mowry [^3].
 
 The runtime complexity described in [^2] is $\mathcal{O}((m + n \log \log n) \log^2 n \log(nW))$, where $-W$ is the smallest edge weight. This complexity is achieved using Thorup's integer priority queue [^4], but implementing such a priority queue would be a substantial project on its own.
 
