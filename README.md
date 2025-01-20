@@ -5,8 +5,8 @@ This repository provides a standalone C++ implementation of the fast single-sour
 The runtime complexity described in [^2] is $\mathcal{O}((m + n \log \log n) \log^2 n \log(nW))$, where $-W$ is the smallest edge weight. This complexity is achieved using Thorup's integer priority queue [^4], but implementing such a priority queue would be a substantial project on its own.
 
 Our implementation offers two alternatives for priority queues:
-- **Thin Heap:** If `-DTHIN_HEAP` is defined during compilation, the implementation uses `g++`'s policy-based thin heap. This results in a runtime complexity of $\mathcal{O}((m + n \log n) \log^2 n \log(nW))$.
-- **Pairing Heap (Default):** Without `-DTHIN_HEAP`, the implementation defaults to using a pairing heap, which achieves a runtime complexity of $\mathcal{O}(m \log^3 n \log(nW))$. In practice, this option is faster.
+- **Thin Heap:** If `-DTHIN_HEAP` is defined during compilation, the implementation uses [GNU's policy-based thin heap](https://gcc.gnu.org/onlinedocs/libstdc++/ext/pb_ds/pq_performance_tests.html#thin_heap_note). This results in a runtime complexity of $\mathcal{O}((m + n \log n) \log^2 n \log(nW))$.
+- **Pairing Heap (Default):** Without `-DTHIN_HEAP`, the implementation defaults to using a pairing heap, which achieves a runtime complexity of $\mathcal{O}(m \log^3 n \log(nW))$. Despite having a worse theoretical complexity, the pairing heap is faster in practice.
 
 
 _This is primarily a fun project, and it's important to note that a non-naive implementation of classic algorithms like Bellman-Ford will generally be faster in practice. Nonetheless, unlike many other recent theoretical breakthrough algorithms for classic problems, this one seems to be actually somewhat usable in practice._
