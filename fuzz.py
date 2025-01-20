@@ -1,5 +1,3 @@
-from timeit import timeit
-
 import networkx as nx
 import random
 import subprocess
@@ -7,36 +5,42 @@ import numpy
 
 random.seed(42)
 numpy.random.seed(42)
+
 def gen(n, m):
     lo, hi = -10**9, 10**9
     while True:
-        T = nx.dfs_tree(nx.random_labeled_tree(n), 0)
-        for u, v in T.edges():
-            T[u][v]['weight'] = random.randint(lo, hi)
+        G = nx.dfs_tree(nx.random_labeled_tree(n), 0)
+        for u, v in G.edges():
+            G[u][v]['weight'] = random.randint(lo, hi)
         dist = [float('inf')] * n
         dist[0] = 0
-        for u, v in nx.dfs_edges(T, 0):
-            dist[v] = dist[u] + T[u][v]['weight']
+        for u, v in nx.dfs_edges(G, 0):
+            dist[v] = dist[u] + G[u][v]['weight']
         for _ in range(m - (n-1)):
-            while True:
+            u, v = random.sample(range(n), 2)
+            while G.has_edge(u, v) or not (lo <= dist[v] - dist[u] <= hi):
                 u, v = random.sample(range(n), 2)
-                if T.has_edge(u, v):
-                    continue
-                if not (lo <= dist[v] - dist[u] <= hi):
-                    continue
-                T.add_edge(u, v, weight=random.randint(max(lo, dist[v] - dist[u]), hi))
-                break
-        assert not nx.negative_edge_cycle(T)
-        yield T, dist
+            G.add_edge(u, v, weight=random.randint(max(lo, dist[v] - dist[u]), hi))
+        assert not nx.negative_edge_cycle(G)
+        yield G, dist
 
-for G, solution in gen(5*10**4, 10**5):
-    with open('fuzz.in', 'w') as f:
-        f.write(f'{G.number_of_nodes()} {G.number_of_edges()}\n')
-        for u, v in G.edges():
-            f.write(f'{u+1} {v+1} {G[u][v]["weight"]}\n')
-        f.write(' '.join(map(str, solution)))
-    print('running...')
-    with open('fuzz.in', 'r') as f:
-        subprocess.run('./cmake-build-release/sssp', check=True, stdin=f)
-    print('ok')
+def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('executable')
+    parser.add_argument('-n', type=int, default=100)
+    parser.add_argument('-m', type=int, default=500)
+    args = parser.parse_args()
+    for i, (G, solution) in enumerate(gen(args.n, args.m), start=1):
+        with open('fuzz.in', 'w') as f:
+            f.write(f'{G.number_of_nodes()} {G.number_of_edges()}\n')
+            for u, v in G.edges():
+                f.write(f'{u+1} {v+1} {G[u][v]["weight"]}\n')
+            f.write(' '.join(map(str, solution)))
+        print('running...', end=' ')
+        with open('fuzz.in', 'r') as f:
+            subprocess.run(args.executable, check=True, stdin=f, stdout=subprocess.DEVNULL)
+        print(f'ok ({i})')
 
+if __name__ == '__main__':
+    main()
