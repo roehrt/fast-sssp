@@ -12,4 +12,3 @@ set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -ggdb3 -fsanitize=address,undefined -fno-omit-
 -fno-sanitize-recover=all -fmax-errors=2 -D_GLIBCXX_DEBUG -D_LIBCPP_DEBUG -D_GLIBCXX_ASSERTIONS")
 
 add_executable(sssp main.cpp)
-add_executable(bellmanford bellman-ford.cpp)
