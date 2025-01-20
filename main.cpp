@@ -4,7 +4,7 @@ std::mt19937 rng(42);
 
 using len = int64_t;
 len operator ""_l(unsigned long long x) { return static_cast<len>(x); }
-const len inf = std::numeric_limits<len>::max() / 2;
+const len inf = std::numeric_limits<len>::max();
 #ifdef THIN_HEAP
 using heap_tag = __gnu_pbds::thin_heap_tag;
 #else
