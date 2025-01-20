@@ -5,8 +5,13 @@ std::mt19937 rng(42);
 using len = int64_t;
 len operator ""_l(unsigned long long x) { return static_cast<len>(x); }
 const len inf = std::numeric_limits<len>::max() / 2;
+#ifdef THIN_HEAP
+using heap_tag = __gnu_pbds::thin_heap_tag;
+#else
+using heap_tag = __gnu_pbds::pairing_heap_tag;
+#endif
 using graph = std::vector<std::vector<std::pair<int, len>>>;
-using priority_queue = __gnu_pbds::priority_queue<std::pair<len, int>, std::greater<>>;
+using priority_queue = __gnu_pbds::priority_queue<std::pair<len, int>, std::greater<>, heap_tag>;
 
 graph transpose(const graph &G) {
     graph Gt(std::ssize(G));
@@ -220,34 +225,34 @@ std::vector<len> scale(graph G) {
         for (auto &[v, w] : G[u])
             w += (W + 1) / 2;
 
-    std::function<std::vector<len>(graph, len)> dfs = [&W, &dfs](graph H, len d) -> std::vector<len> {
-        if (H.size() <= 1 || d <= W / 2) return std::vector(std::ssize(H), 0_l);
-        auto S = decompose(H, d);
-        auto G = H;
-        remove_edges(H, S);
+    std::function<std::vector<len>(graph, len)> dfs = [&W, &dfs](graph HS, len d) -> std::vector<len> {
+        if (HS.size() <= 1 || d <= W / 2) return std::vector(std::ssize(HS), 0_l);
+        auto S = decompose(HS, d);
+        auto H = HS;
+        remove_edges(HS, S);
 
-        auto [cn, c] = strongly_connected_components(H);
+        auto [cn, c] = strongly_connected_components(HS);
         std::vector<std::vector<int>> scc(cn);
-        for (int i = 0; i < std::ssize(G); ++i) scc[c[i]].push_back(i);
+        for (int i = 0; i < std::ssize(H); ++i) scc[c[i]].push_back(i);
 
-        std::vector<int> lookup(std::ssize(G));
-        std::vector phi(std::ssize(G), 0_l);
+        std::vector<int> lookup(std::ssize(H));
+        std::vector phi(std::ssize(H), 0_l);
         for (int i = 0; i < cn; ++i) {
             graph U(scc[i].size());
             for (int j = 0; j < std::ssize(scc[i]); ++j) lookup[scc[i][j]] = j;
             for (int j = 0; j < std::ssize(scc[i]); ++j) {
                 int u = scc[i][j];
-                for (const auto &[v, w] : G[u]) {
+                for (const auto &[v, w] : H[u]) {
                     if (c[u] == c[v]) U[j].emplace_back(lookup[v], w);
                 }
             }
-            auto di = U.size() <= 3.0 / 4.0 * G.size() ? d : d / 2;
+            auto di = U.size() <= 3.0 / 4.0 * H.size() ? d : d / 2;
             auto psi = dfs(U, di);
             for (int j = 0; j < std::ssize(U); ++j) phi[scc[i][j]] = psi[j];
         }
 
-        fix_dag_edges(H, phi);
-        bellman_ford_dijkstra(G, phi);
+        fix_dag_edges(HS, phi);
+        bellman_ford_dijkstra(H, phi);
         return phi;
     };
 
