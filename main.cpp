@@ -63,7 +63,7 @@ void reweight(graph &G, const std::vector<len> &phi) {
 }
 
 std::vector<double> approximate_ball_sizes(const graph& G, len r, double epsilon) {
-    const double MAGIC_CONSTANT = 0.01; // Used to be 5;
+    const double MAGIC_CONSTANT = 0.001; // Used to be 5;
     const int samples = ceil(MAGIC_CONSTANT * log(G.size()) / std::pow(epsilon, 2));
     assert(samples > 0);
 
