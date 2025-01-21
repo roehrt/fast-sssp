@@ -228,8 +228,8 @@ std::vector<len> scale(graph G) {
         for (auto &[v, w] : G[u])
             w += (W + 1) / 2;
 
-    std::function<std::vector<len>(graph, len)> dfs = [&W, &dfs](graph H, len d) -> std::vector<len> {
-        if (H.size() <= 1 || d <= W / 2) return std::vector(H.size(), 0_l);
+    std::function<std::vector<len>(graph, len)> dfs = [&dfs](graph H, len d) -> std::vector<len> {
+        if (minimum_weight(H) >= 0) return std::vector(H.size(), 0_l);
         auto S = decompose(H, d);
         auto HS = H;
         remove_edges(HS, S);
