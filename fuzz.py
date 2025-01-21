@@ -37,7 +37,7 @@ def main():
             for u, v in G.edges():
                 f.write(f'{u+1} {v+1} {G[u][v]["weight"]}\n')
             f.write(' '.join(map(str, solution)))
-        print('running...', end=' ')
+        print('running...', end=' ', flush=True)
         with open('fuzz.in', 'r') as f:
             subprocess.run(args.executable, check=True, stdin=f, stdout=subprocess.DEVNULL)
         print(f'ok ({i})')
