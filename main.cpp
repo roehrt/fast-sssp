@@ -44,7 +44,8 @@ auto strongly_connected_components(const graph &G) {
         return b[u] = t;
     };
     for (int u = 0; u < std::ssize(G); ++u) if (!c[u]) f(u);
-    return std::pair{cn+1, c};
+    for (int &x : c) x = cn - x;
+    return std::pair{cn, c};
 }
 
 len minimum_weight(const graph &G) {
@@ -80,11 +81,11 @@ std::vector<double> approximate_ball_sizes(const graph& G, len r, double epsilon
         while (!pq.empty()) {
             auto [_, u] = pq.top();
             pq.pop();
+            out_ball.push_back(u);
             for (const auto &[v, w] : G[u]) {
                 if (dist[u] + w > r) continue;
                 if (dist[v] == inf) {
                     it[v] = pq.push({dist[v] = dist[u] + w, v});
-                    out_ball.push_back(v);
                 } else if (dist[v] > dist[u] + w) {
                     pq.modify(it[v], {dist[v] = dist[u] + w, v});
                 }
@@ -119,7 +120,8 @@ std::vector<std::pair<int, int>> decompose(graph H, len d) {
     auto in_light = in_light_vertices(H, d);
     auto out_light = in_light_vertices(Ht, d);
 
-    double p = std::min(1.0 - std::numeric_limits<double>::epsilon(), 20 * log(H.size()) / d);
+    const double MAGIC_CONSTANT = 20;
+    double p = std::min(1.0 - std::numeric_limits<double>::epsilon(), MAGIC_CONSTANT * log(H.size()) / d);
     std::geometric_distribution<len> geom(p);
 
     std::vector<std::pair<int, int>> S;
@@ -128,7 +130,7 @@ std::vector<std::pair<int, int>> decompose(graph H, len d) {
     std::vector dist(H.size(), inf);
     priority_queue pq;
     std::vector<priority_queue::point_iterator> it(H.size());
-    auto carve = [&](auto &G, auto &light) {
+    auto carve = [&](const auto &G, const auto &light) {
         for (int i = 0; i < std::ssize(G); ++i) {
             if (!light[i] || is_deleted[i]) continue;
             len r = geom(rng);
@@ -151,8 +153,9 @@ std::vector<std::pair<int, int>> decompose(graph H, len d) {
             }
         }
     };
-    carve(H, out_light);
     carve(Ht, in_light);
+    for (auto &[u, v] : S) std::swap(u, v);
+    carve(H, out_light);
     return S;
 }
 
@@ -166,7 +169,7 @@ void fix_dag_edges(const graph &G, std::vector<len> &phi) {
             for (const auto &[v, w] : G[u]) {
                 if (c[u] == c[v]) continue;
                 len w_prime = w + phi[u] - phi[v];
-                phi_prime[c[u]] = std::min(phi_prime[c[u]], phi_prime[c[v]] + w_prime);
+                phi_prime[c[v]] = std::min(phi_prime[c[v]], phi_prime[c[u]] + w_prime);
             }
         }
     }
@@ -225,28 +228,27 @@ std::vector<len> scale(graph G) {
         for (auto &[v, w] : G[u])
             w += (W + 1) / 2;
 
-    std::function<std::vector<len>(graph, len)> dfs = [&W, &dfs](graph HS, len d) -> std::vector<len> {
-        if (HS.size() <= 1 || d <= W / 2) return std::vector(std::ssize(HS), 0_l);
-        auto S = decompose(HS, d);
-        auto H = HS;
+    std::function<std::vector<len>(graph, len)> dfs = [&W, &dfs](graph H, len d) -> std::vector<len> {
+        if (H.size() <= 1 || d <= W / 2) return std::vector(H.size(), 0_l);
+        auto S = decompose(H, d);
+        auto HS = H;
         remove_edges(HS, S);
 
         auto [cn, c] = strongly_connected_components(HS);
         std::vector<std::vector<int>> scc(cn);
         for (int i = 0; i < std::ssize(H); ++i) scc[c[i]].push_back(i);
 
-        std::vector<int> lookup(std::ssize(H));
-        std::vector phi(std::ssize(H), 0_l);
+        std::vector<int> lookup(H.size());
+        std::vector phi(H.size(), 0_l);
         for (int i = 0; i < cn; ++i) {
             graph U(scc[i].size());
             for (int j = 0; j < std::ssize(scc[i]); ++j) lookup[scc[i][j]] = j;
             for (int j = 0; j < std::ssize(scc[i]); ++j) {
                 int u = scc[i][j];
-                for (const auto &[v, w] : H[u]) {
+                for (const auto &[v, w] : H[u])
                     if (c[u] == c[v]) U[j].emplace_back(lookup[v], w);
-                }
             }
-            auto di = U.size() <= 3.0 / 4.0 * H.size() ? d : d / 2;
+            auto di = U.size() <= 3.0 / 4.0 * H.size() ? d : (d+1) / 2;
             auto psi = dfs(U, di);
             for (int j = 0; j < std::ssize(U); ++j) phi[scc[i][j]] = psi[j];
         }
@@ -288,13 +290,31 @@ std::pair<std::vector<len>, std::vector<int>> single_source_shortest_path(const 
     for (int u = 0; u < std::ssize(H); ++u)
         for (auto &[v, w] : H[u])
             w *= std::ssize(H);
-    while (minimum_weight(H) < -1) {
-        auto psi = scale(H);
-        reweight(H, psi);
+    auto [cn, c] = strongly_connected_components(H);
+    std::vector<std::vector<int>> scc(cn);
+    for (int i = 0; i < std::ssize(H); ++i) scc[c[i]].push_back(i);
+    std::vector<int> lookup(G.size());
+    std::vector<len> phi(G.size());
+    for (int i = 0; i < cn; ++i) {
+        graph U(scc[i].size());
+        for (int j = 0; j < std::ssize(scc[i]); ++j) lookup[scc[i][j]] = j;
+        for (int j = 0; j < std::ssize(scc[i]); ++j) {
+            int u = scc[i][j];
+            for (const auto &[v, w] : H[u])
+                if (c[u] == c[v]) U[j].emplace_back(lookup[v], w);
+        }
+        while (minimum_weight(U) < -1) {
+            auto psi = scale(U);
+            reweight(U, psi);
+            for (int j = 0; j < std::ssize(U); ++j) phi[scc[i][j]] += psi[j];
+        }
     }
+    fix_dag_edges(H, phi);
+    reweight(H, phi);
     for (int u = 0; u < std::ssize(H); ++u)
         for (auto &[v, w] : H[u])
             w += 1;
+
     auto [_, par] = dijkstra(H, s);
 
     auto Gt = transpose(G);
@@ -323,7 +343,11 @@ int main() {
         G[u].emplace_back(v, w);
     }
 
+    auto start = std::chrono::high_resolution_clock::now();
     auto [dist, par] = single_source_shortest_path(G, 0);
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+    std::cerr << duration.count() / 1000.0 << " s\n";
     for (int j = 0; j < n; ++j) std::cout << dist[j] << " \n"[j == n - 1];
     for (int j = 0; j < n; ++j) std::cout << par[j] + 1 << " \n"[j == n - 1];
 }
